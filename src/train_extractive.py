@@ -1,10 +1,5 @@
-#!/usr/bin/env python
-"""
-    Main training workflow
-"""
-
+from others.tokenization import BertTokenizer
 import torch
-
 from models import data_loader
 from models.model_builder import ExtSummarizer
 from models.trainer_ext import build_trainer
@@ -27,12 +22,18 @@ def test_text_ext(args):
     model = ExtSummarizer(args, device, checkpoint)
     model.eval()
 
+    text = args.text
+    do = True
     # python train.py -text_src ../raw_data/temp_ext.raw_src -test_from ../models/bertext.pt
-    test_iter = data_loader.load_text(args, args.text, args.text_tgt, device)
+    while do: 
+        test_iter = data_loader.load_text(args, text, args.text_tgt, device)
+        trainer = build_trainer(args, device_id, model)
+        result = trainer.test(test_iter, -1)
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+        text = ' '.join(result)
+        if(len(tokenizer.tokenize(text)) < 250):
+            do = False
 
-    trainer = build_trainer(args, device_id, model)
-    result = trainer.test(test_iter, -1)
-    for r in result:
-        print(r)
+    print(text)
 
 

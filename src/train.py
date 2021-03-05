@@ -111,5 +111,4 @@ if __name__ == '__main__':
             test_text_abs(args)
 
     elif (args.task == 'ext'):
-            print(args)
             test_text_ext(args)

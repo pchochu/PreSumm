@@ -59,7 +59,7 @@ class Trainer(object):
                         else:
                             _pred.append(candidate)
 
-                        if ((not self.args.recall_eval) and len(_pred) == 3):
+                        if ((not self.args.recall_eval) and len(_pred) == 5):
                             break
 
                     _pred = ' '.join(_pred)
