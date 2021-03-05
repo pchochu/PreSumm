@@ -1,17 +1,7 @@
-#!/usr/bin/env python
-"""
-    Main training workflow
-"""
-from __future__ import division
-
 import argparse
 import os
-from others.logging import init_logger
-from train_abstractive import validate_abs, train_abs, baseline, test_abs, test_text_abs
-from train_extractive import train_ext, validate_ext, test_ext
-
-model_flags = ['hidden_size', 'ff_size', 'heads', 'emb_size', 'enc_layers', 'enc_hidden_size', 'enc_ff_size',
-               'dec_layers', 'dec_hidden_size', 'dec_ff_size', 'encoder', 'ff_actv', 'use_interval']
+from train_abstractive import test_text_abs
+from train_extractive import test_text_ext
 
 
 def str2bool(v):
@@ -22,21 +12,21 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
-
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-task", default='ext', type=str, choices=['ext', 'abs'])
     parser.add_argument("-encoder", default='bert', type=str, choices=['bert', 'baseline'])
-    parser.add_argument("-mode", default='train', type=str, choices=['train', 'validate', 'test'])
+    parser.add_argument("-mode", default='train', type=str, choices=['train', 'validate', 'test', 'test_text'])
     parser.add_argument("-bert_data_path", default='../bert_data_new/cnndm')
     parser.add_argument("-model_path", default='../models/')
     parser.add_argument("-result_path", default='../results/cnndm')
     parser.add_argument("-temp_dir", default='../temp')
+    parser.add_argument("-text_src", default='')
+    parser.add_argument("-text_tgt", default='')
 
     parser.add_argument("-batch_size", default=140, type=int)
     parser.add_argument("-test_batch_size", default=200, type=int)
+    parser.add_argument("-max_ndocs_in_batch", default=6, type=int)
 
     parser.add_argument("-max_pos", default=512, type=int)
     parser.add_argument("-use_interval", type=str2bool, nargs='?',const=True,default=True)
@@ -113,50 +103,12 @@ if __name__ == '__main__':
     args.world_size = len(args.gpu_ranks)
     os.environ["CUDA_VISIBLE_DEVICES"] = args.visible_gpus
 
-    init_logger(args.log_file)
     device = "cpu" if args.visible_gpus == '-1' else "cuda"
     device_id = 0 if device == "cuda" else -1
 
     if (args.task == 'abs'):
-        if (args.mode == 'train'):
-            train_abs(args, device_id)
-        elif (args.mode == 'validate'):
-            validate_abs(args, device_id)
-        elif (args.mode == 'lead'):
-            baseline(args, cal_lead=True)
-        elif (args.mode == 'oracle'):
-            baseline(args, cal_oracle=True)
-        if (args.mode == 'test'):
-            cp = args.test_from
-            try:
-                step = int(cp.split('.')[-2].split('_')[-1])
-            except:
-                step = 0
-            test_abs(args, device_id, cp, step)
-        elif (args.mode == 'test_text'):
-            cp = args.test_from
-            try:
-                step = int(cp.split('.')[-2].split('_')[-1])
-            except:
-                step = 0
-                test_text_abs(args, device_id, cp, step)
+            test_text_abs(args)
 
     elif (args.task == 'ext'):
-        if (args.mode == 'train'):
-            train_ext(args, device_id)
-        elif (args.mode == 'validate'):
-            validate_ext(args, device_id)
-        if (args.mode == 'test'):
-            cp = args.test_from
-            try:
-                step = int(cp.split('.')[-2].split('_')[-1])
-            except:
-                step = 0
-            test_ext(args, device_id, cp, step)
-        elif (args.mode == 'test_text'):
-            cp = args.test_from
-            try:
-                step = int(cp.split('.')[-2].split('_')[-1])
-            except:
-                step = 0
-                test_text_abs(args, device_id, cp, step)
+            print(args)
+            test_text_ext(args)

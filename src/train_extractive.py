@@ -2,244 +2,37 @@
 """
     Main training workflow
 """
-from __future__ import division
-
-import argparse
-import glob
-import os
-import random
-import signal
-import time
 
 import torch
 
-import distributed
-from models import data_loader, model_builder
-from models.data_loader import load_dataset
+from models import data_loader
 from models.model_builder import ExtSummarizer
 from models.trainer_ext import build_trainer
-from others.logging import logger, init_logger
 
 model_flags = ['hidden_size', 'ff_size', 'heads', 'inter_layers', 'encoder', 'ff_actv', 'use_interval', 'rnn_size']
 
+text = '''
+The Vanguard Consumer Staples Index ETF (NYSEARCA: VDC ) offers investors targeted exposure to stocks in one of the core market sectors through a low-cost diversified exchange-traded fund. Given the ongoing coronavirus pandemic, consumer staples have represented a defensive position for many investors, considering many companies benefited from consumers stocking up on items during worldwide lockdown measures. At the same time, other companies in the group with broader exposure beyond household essentials have had their business disrupted with parts of the economy shut down. We take a more cautious outlook on the fund and highlight some weaker growth trends and valuation concerns among some of the top holdings that now represent headwinds from current levels. (Source: finviz.com) VDC Background The VDC ETF with $5.8 billion in total assets and 92 underlying holdings tracks the "MSCI US IMI Consumer Staples Index". The index and fund are cap-weighted and include U.S. large, mid, and small-cap consumer staples companies that represent a passive approach to capture sector trends. (Source: Vanguard ) Consumer staples typically refer to goods that are considered essential or at least a recurring part of consumer spending budgets. It's understood that these companies are less exposed to the economic cycle as consumers in a recession would still require food and beverages, household and personal items, along with resilient demand for alcohol and tobacco. Companies like Procter & Gamble (NYSE: PG ) and PepsiCo Inc. (NASDAQ: PEP ), among the top 3 holdings, are representative of the classic staples stock. The classifications have some subjectivity with some companies featuring different products and business models that may fall into the discretionary category. An example here is Walmart Inc. (NYSE: WMT ) and Costco Wholesale Corp. (NASDAQ: COST ), which are the 4th and 5th largest holdings, with combined a 14% weighting in the fund. While these retailers specialize in everyday consumer items, some products at their stores like electronics, clothing, toys, and jewelry, for example, can face varying demand trends depending on economic conditions. Individual stocks within the group will also trade based on various company-specific or industry trends. VDC Performance One of the features of the consumer staples sector and the VDC ETF is the relatively high concentration among the top holdings. The top 5 stocks, including PG, PEP, WMT, COST, and also Coca-Cola Co. (NYSE: KO ), together represent nearly 48% of the entire fund. This is a function of the market-cap weighting methodology and consistent with the importance of these companies. This means that the performance of these stocks will drive returns for the entire sector and ETF. VDC has declined about 9% year to date in 2020, which includes the period of extreme volatility in March along with a more recent rebound. From the market lows in late March, VDC is up 18%. The current ETF share price at $146 is a level the fund first traded at back in early 2018, highlighting what has been relatively flat returns over the period, although trading in a wide range. Data by YCharts This year has been defined by the ongoing coronavirus pandemic, which introduced some unique dynamics that have impacted consumer staple companies differently. Among the underlying holdings, we find a dispersion of returns this year and continued volatility. There have been some obvious winners in the "stay-at-home" trend, with consumers stocking up on household essentials and groceries, given global quarantine measures. A big winner has been Clorox Company (NYSE: CLX ) with its vast line of disinfecting products that are also used at the industrial scale by corporate customers and public agencies. CLX is up 34% year to date. Packaged foods giant General Mills Inc. (NYSE: GIS ) and grocery store chain The Kroger Co. (NYSE: KR ) are each up 14% year to date as beneficiaries from the consumer lockdowns. (Source: data by YCharts/ table by author) Still, there were some losers, particularly those companies that were disrupted by the shutdown of restaurants and other public spaces. Coca-Cola, as the world's largest beverage company, is down 17% and representing 10% of the VDC lost significant global sales as dining out options and large scale venues where consumers typically enjoy soft drinks have been forced to close. Sysco Corp. (NYSE: SYY ) has been one of the weakest stocks in the group down 40% this year as a large portion of the business supplies the restaurant industry with key cooking ingredients. Analysis and Forward-Looking Commentary The pandemic has represented a historic level of economic disruption that makes the medium-term outlook for all companies particularly uncertain. On one hand, the consensus is that the enormous level of relief measures between the Fed and U.S. government is likely to mitigate many of the near-term consequences of the economic shutdown. Generous unemployment benefits and wide-reaching federally-backed loan programs can keep businesses afloat during the most challenging period before conditions can normalize. Still, weaker consumer incomes can represent a challenge for consumer staples, even if they are more resilient compared to discretionary purchases. The other side to that is the potential that some of the damages to the economy are not temporary especially as it relates to the labor market. A level of structurally higher unemployment through 2021 represents one of the major risk factors facing the economic recovery and the outlook for consumer staples. If more people are unemployed, consumer spending will be pressured representing growth headwinds. There is also a dynamic where some stocks within VDC have been bid up based on a potentially only-temporary windfall of strong trends during the initial stages of the pandemic. As the economy begins to reopen, and consumers no longer need to hoard household essentials, companies like General Mills ( GIS ) and Kimberly-Clark (NYSE: KMB ) could have a weaker second half of the year as consumers go through personal inventories. Keep in mind that this is a global crisis, and most of the consumer staples companies in VDC generate significant levels of revenue and operating income from international markets, meaning they are exposed to broad macro trends. We also expect that the recovery in foreign countries where consumer staples companies do business will be weaker as many cannot afford the same level of stimulus measures offered in the United States. Stretched Valuation The appearance right now with the fund down just 9% in 2020 is that the market is taking a glass-half-full type of approach, giving consumer staples a benefit of the doubt. We are more skeptical and note that many key stocks are trading near their all-time high despite the higher risks. Procter & Gamble represents 15% of the fund as the largest holding and is a good example of what we see as stretched valuations. Data by YCharts The stock trades at a price to sales multiple of 4.2x, which has climbed steadily over the past decade. This compares to a 10-year average P/S for the stock at 3.2x, implying investors are paying 31% more for every dollar the company generates in revenue. Separately, PG is also trading a forward price to earnings multiple of 22.8x compared to a 10-year average of 20.8x. By this measure, the stock is 10% overvalued. This dynamic applies to the other top holdings in the fund that trades at a relatively wide premium compared to long term P/E averages. 10% (Source: data by YCharts/table by author) We argue that heading into a recessionary environment, most stocks should not trade at a premium to levels from the prior bull market. Our expectation is for all companies to see weaker growth and earnings trends through 2021. At the ETF level, we note that VDC's dividend yield of 2.6% compares to the S&P 500 (NYSEARCA: SPY ) at 2.0%. Again, we think the yield should be wider to compensate for the higher risks as another bearish factor. Data by YCharts Verdict Consumer staples benefited as a defensive trade during the early stages of the pandemic with several companies benefiting from trends in household spending. We think investors should look out through 2021 and discount the higher level of uncertainties, with weaker trends in growth representing a downside risk for the group and the VDC ETF. VDC is a good option to capture passive exposure to sector trends in a low-cost ETF with an expense ratio of just 0.1%. That being said, we are on the sidelines of this group and think patient investors can find a better entry point later this year. The following factors summarize the risks and bearish case for the VDC ETF. Are you interested to learn how this idea can fit within a diversified portfolio? With the Core-Satellite Dossier marketplace service, we sort through +4,000 ETFs/CEFs along with +16,000 U.S. stocks/ADRs to find the best trade ideas. Click here for a two-week free trial and explore our content. Disclosure: I/we have no positions in any stocks mentioned, and no plans to initiate any positions within the next 72 hours. I wrote this article myself, and it expresses my own opinions. I am not receiving compensation for it (other than from Seeking Alpha). I have no business relationship with any company whose stock is mentioned in this article.'''
 
-def train_multi_ext(args):
-    """ Spawns 1 process per GPU """
-    init_logger()
-
-    nb_gpu = args.world_size
-    mp = torch.multiprocessing.get_context('spawn')
-
-    # Create a thread to listen for errors in the child processes.
-    error_queue = mp.SimpleQueue()
-    error_handler = ErrorHandler(error_queue)
-
-    # Train with multiprocessing.
-    procs = []
-    for i in range(nb_gpu):
-        device_id = i
-        procs.append(mp.Process(target=run, args=(args,
-                                                  device_id, error_queue,), daemon=True))
-        procs[i].start()
-        logger.info(" Starting process pid: %d  " % procs[i].pid)
-        error_handler.add_child(procs[i].pid)
-    for p in procs:
-        p.join()
-
-
-def run(args, device_id, error_queue):
-    """ run process """
-    setattr(args, 'gpu_ranks', [int(i) for i in args.gpu_ranks])
-
-    try:
-        gpu_rank = distributed.multi_init(device_id, args.world_size, args.gpu_ranks)
-        print('gpu_rank %d' % gpu_rank)
-        if gpu_rank != args.gpu_ranks[device_id]:
-            raise AssertionError("An error occurred in \
-                  Distributed initialization")
-
-        train_single_ext(args, device_id)
-    except KeyboardInterrupt:
-        pass  # killed by parent, do nothing
-    except Exception:
-        # propagate exception to parent process, keeping original traceback
-        import traceback
-        error_queue.put((args.gpu_ranks[device_id], traceback.format_exc()))
-
-
-class ErrorHandler(object):
-    """A class that listens for exceptions in children processes and propagates
-    the tracebacks to the parent process."""
-
-    def __init__(self, error_queue):
-        """ init error handler """
-        import signal
-        import threading
-        self.error_queue = error_queue
-        self.children_pids = []
-        self.error_thread = threading.Thread(
-            target=self.error_listener, daemon=True)
-        self.error_thread.start()
-        signal.signal(signal.SIGUSR1, self.signal_handler)
-
-    def add_child(self, pid):
-        """ error handler """
-        self.children_pids.append(pid)
-
-    def error_listener(self):
-        """ error listener """
-        (rank, original_trace) = self.error_queue.get()
-        self.error_queue.put((rank, original_trace))
-        os.kill(os.getpid(), signal.SIGUSR1)
-
-    def signal_handler(self, signalnum, stackframe):
-        """ signal handler """
-        for pid in self.children_pids:
-            os.kill(pid, signal.SIGINT)  # kill children processes
-        (rank, original_trace) = self.error_queue.get()
-        msg = """\n\n-- Tracebacks above this line can probably
-                 be ignored --\n\n"""
-        msg += original_trace
-        raise Exception(msg)
-
-
-def validate_ext(args, device_id):
-    timestep = 0
-    if (args.test_all):
-        cp_files = sorted(glob.glob(os.path.join(args.model_path, 'model_step_*.pt')))
-        cp_files.sort(key=os.path.getmtime)
-        xent_lst = []
-        for i, cp in enumerate(cp_files):
-            step = int(cp.split('.')[-2].split('_')[-1])
-            xent = validate(args, device_id, cp, step)
-            xent_lst.append((xent, cp))
-            max_step = xent_lst.index(min(xent_lst))
-            if (i - max_step > 10):
-                break
-        xent_lst = sorted(xent_lst, key=lambda x: x[0])[:3]
-        logger.info('PPL %s' % str(xent_lst))
-        for xent, cp in xent_lst:
-            step = int(cp.split('.')[-2].split('_')[-1])
-            test_ext(args, device_id, cp, step)
-    else:
-        while (True):
-            cp_files = sorted(glob.glob(os.path.join(args.model_path, 'model_step_*.pt')))
-            cp_files.sort(key=os.path.getmtime)
-            if (cp_files):
-                cp = cp_files[-1]
-                time_of_cp = os.path.getmtime(cp)
-                if (not os.path.getsize(cp) > 0):
-                    time.sleep(60)
-                    continue
-                if (time_of_cp > timestep):
-                    timestep = time_of_cp
-                    step = int(cp.split('.')[-2].split('_')[-1])
-                    validate(args, device_id, cp, step)
-                    test_ext(args, device_id, cp, step)
-
-            cp_files = sorted(glob.glob(os.path.join(args.model_path, 'model_step_*.pt')))
-            cp_files.sort(key=os.path.getmtime)
-            if (cp_files):
-                cp = cp_files[-1]
-                time_of_cp = os.path.getmtime(cp)
-                if (time_of_cp > timestep):
-                    continue
-            else:
-                time.sleep(300)
-
-
-def validate(args, device_id, pt, step):
-    device = "cpu" if args.visible_gpus == '-1' else "cuda"
-    if (pt != ''):
-        test_from = pt
-    else:
-        test_from = args.test_from
-    logger.info('Loading checkpoint from %s' % test_from)
-    checkpoint = torch.load(test_from, map_location=lambda storage, loc: storage)
+def test_text_ext(args):
+    checkpoint = torch.load(args.test_from, map_location=lambda storage, loc: storage)
     opt = vars(checkpoint['opt'])
     for k in opt.keys():
         if (k in model_flags):
             setattr(args, k, opt[k])
-    print(args)
+
+    device = "cpu" if args.visible_gpus == '-1' else "cuda"
+    device_id = 0 if device == "cuda" else -1
 
     model = ExtSummarizer(args, device, checkpoint)
     model.eval()
 
-    valid_iter = data_loader.Dataloader(args, load_dataset(args, 'valid', shuffle=False),
-                                        args.batch_size, device,
-                                        shuffle=False, is_test=False)
-    trainer = build_trainer(args, device_id, model, None)
-    stats = trainer.validate(valid_iter, step)
-    return stats.xent()
+    # python train.py -text_src ../raw_data/temp_ext.raw_src -test_from ../models/bertext.pt
+    test_iter = data_loader.load_text(args, args.text, args.text_tgt, device)
+
+    trainer = build_trainer(args, device_id, model)
+    result = trainer.test(test_iter, -1)
+    for r in result:
+        print(r)
 
 
-def test_ext(args, device_id, pt, step):
-    device = "cpu" if args.visible_gpus == '-1' else "cuda"
-    if (pt != ''):
-        test_from = pt
-    else:
-        test_from = args.test_from
-    logger.info('Loading checkpoint from %s' % test_from)
-    checkpoint = torch.load(test_from, map_location=lambda storage, loc: storage)
-    opt = vars(checkpoint['opt'])
-    for k in opt.keys():
-        if (k in model_flags):
-            setattr(args, k, opt[k])
-    print(args)
-
-    model = ExtSummarizer(args, device, checkpoint)
-    model.eval()
-
-    test_iter = data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
-                                       args.test_batch_size, device,
-                                       shuffle=False, is_test=True)
-    trainer = build_trainer(args, device_id, model, None)
-    trainer.test(test_iter, step)
-
-def train_ext(args, device_id):
-    if (args.world_size > 1):
-        train_multi_ext(args)
-    else:
-        train_single_ext(args, device_id)
-
-
-def train_single_ext(args, device_id):
-    init_logger(args.log_file)
-
-    device = "cpu" if args.visible_gpus == '-1' else "cuda"
-    logger.info('Device ID %d' % device_id)
-    logger.info('Device %s' % device)
-    torch.manual_seed(args.seed)
-    random.seed(args.seed)
-    torch.backends.cudnn.deterministic = True
-
-    if device_id >= 0:
-        torch.cuda.set_device(device_id)
-        torch.cuda.manual_seed(args.seed)
-
-    torch.manual_seed(args.seed)
-    random.seed(args.seed)
-    torch.backends.cudnn.deterministic = True
-
-    if args.train_from != '':
-        logger.info('Loading checkpoint from %s' % args.train_from)
-        checkpoint = torch.load(args.train_from,
-                                map_location=lambda storage, loc: storage)
-        opt = vars(checkpoint['opt'])
-        for k in opt.keys():
-            if (k in model_flags):
-                setattr(args, k, opt[k])
-    else:
-        checkpoint = None
-
-    def train_iter_fct():
-        return data_loader.Dataloader(args, load_dataset(args, 'train', shuffle=True), args.batch_size, device,
-                                      shuffle=True, is_test=False)
-
-    model = ExtSummarizer(args, device, checkpoint)
-    optim = model_builder.build_optim(args, model, checkpoint)
-
-    logger.info(model)
-
-    trainer = build_trainer(args, device_id, model, optim)
-    trainer.train(train_iter_fct, args.train_steps)
